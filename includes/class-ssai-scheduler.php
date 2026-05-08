@@ -137,7 +137,7 @@ class SSAI_Scheduler {
 				AND (next_attempt_at IS NULL OR next_attempt_at <= %s)
 				AND (lock_token IS NULL OR locked_at < DATE_SUB(%s, INTERVAL 10 MINUTE))
 				ORDER BY scheduled_at ASC
-				LIMIT 1",
+				LIMIT 20",
 				$now,
 				$now,
 				$now
@@ -204,7 +204,7 @@ class SSAI_Scheduler {
 
 		if ( 'scheduled' === $status ) {
 			$delay = min( 60, 5 * max( 1, $attempts ) );
-			$next  = gmdate( 'Y-m-d H:i:s', time() + ( $delay * MINUTE_IN_SECONDS ) );
+			$next  = wp_date( 'Y-m-d H:i:s', time() + ( $delay * MINUTE_IN_SECONDS ), wp_timezone() );
 		}
 
 		$wpdb->update(

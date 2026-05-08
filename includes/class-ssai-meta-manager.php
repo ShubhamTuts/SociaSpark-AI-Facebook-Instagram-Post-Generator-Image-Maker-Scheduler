@@ -44,7 +44,7 @@ class SSAI_Meta_Manager {
 			'account_id'              => $account_id,
 			'encrypted_access_token'  => SSAI_Encryption::encrypt( $token ),
 			'encrypted_refresh_token' => '' !== $refresh ? SSAI_Encryption::encrypt( $refresh ) : null,
-			'token_expires_at'        => ! empty( $data['token_expires_at'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( (string) $data['token_expires_at'] ) ) : null,
+			'token_expires_at'        => self::normalize_site_datetime( $data['token_expires_at'] ?? '' ),
 			'status'                  => 'connected',
 			'meta'                    => wp_json_encode( SSAI_Logger::redact_context( $meta ) ),
 			'created_at'              => $now,
@@ -175,7 +175,7 @@ class SSAI_Meta_Manager {
 			return new WP_Error( 'ssai_connection_not_found', __( 'A connected platform account was not found.', 'sociaspark-ai-social-poster' ), array( 'status' => 404, 'transient' => false ) );
 		}
 
-		if ( ! empty( $row['token_expires_at'] ) && strtotime( $row['token_expires_at'] ) < time() ) {
+		if ( ! empty( $row['token_expires_at'] ) && self::is_past_site_datetime( $row['token_expires_at'] ) ) {
 			self::mark_status( (int) $row['id'], 'expired' );
 			return new WP_Error( 'ssai_connection_expired', __( 'The platform token has expired. Reconnect the account.', 'sociaspark-ai-social-poster' ), array( 'status' => 401, 'transient' => false ) );
 		}
@@ -264,5 +264,43 @@ class SSAI_Meta_Manager {
 		}
 		$row['access_token'] = SSAI_Encryption::decrypt( (string) $row['encrypted_access_token'] );
 		return $row;
+	}
+
+	/**
+	 * Normalizes a dashboard datetime into the site timezone.
+	 *
+	 * @param mixed $value Raw datetime value.
+	 * @return string|null
+	 */
+	private static function normalize_site_datetime( $value ) {
+		$value = is_scalar( $value ) ? trim( (string) wp_unslash( $value ) ) : '';
+		if ( '' === $value ) {
+			return null;
+		}
+
+		try {
+			$date = new DateTimeImmutable( $value, wp_timezone() );
+		} catch ( Exception $exception ) {
+			return null;
+		}
+
+		return $date->setTimezone( wp_timezone() )->format( 'Y-m-d H:i:s' );
+	}
+
+	/**
+	 * Checks whether a stored site-local datetime is already in the past.
+	 *
+	 * @param string $value Stored datetime.
+	 * @return bool
+	 */
+	private static function is_past_site_datetime( $value ) {
+		try {
+			$expires_at = new DateTimeImmutable( (string) $value, wp_timezone() );
+			$now        = new DateTimeImmutable( 'now', wp_timezone() );
+		} catch ( Exception $exception ) {
+			return false;
+		}
+
+		return $expires_at < $now;
 	}
 }
