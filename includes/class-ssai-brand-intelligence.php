@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Builds local brand profiles from approved sources.
  */
 class SSAI_Brand_Intelligence {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This service manages plugin-owned custom tables directly.
 	/**
 	 * Scans available source candidates without storing them.
 	 *
@@ -43,7 +44,7 @@ class SSAI_Brand_Intelligence {
 				continue;
 			}
 
-			$labels = wp_list_pluck( $terms, 'name' );
+			$labels  = wp_list_pluck( $terms, 'name' );
 			$items[] = array(
 				'type'    => 'taxonomy',
 				'id'      => $taxonomy->name,
@@ -161,6 +162,7 @@ class SSAI_Brand_Intelligence {
 			return new WP_Error( 'ssai_brand_file_large', __( 'Brand source file is too large.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 		}
 
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Reads a validated local upload temp file, not a remote URL.
 		$content = file_get_contents( $file['tmp_name'] );
 		if ( false === $content || '' === trim( $content ) ) {
 			return new WP_Error( 'ssai_brand_source_empty', __( 'Brand source content cannot be empty.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
@@ -177,7 +179,7 @@ class SSAI_Brand_Intelligence {
 		return self::add_source(
 			array(
 				'source_type' => 'upload',
-				'title'       => $title ?: $name,
+				'title'       => '' !== $title ? $title : $name,
 				'file_name'   => $name,
 				'content'     => $content,
 			)
@@ -196,11 +198,11 @@ class SSAI_Brand_Intelligence {
 		$table = SSAI_Plugin::table( 'brand_sources' );
 		if ( $active_only ) {
 			$rows = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY id DESC", 'active' ),
+				$wpdb->prepare( 'SELECT * FROM %i WHERE status = %s ORDER BY id DESC', $table, 'active' ),
 				ARRAY_A
 			);
 		} else {
-			$rows = $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id DESC", ARRAY_A );
+			$rows = $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY id DESC', $table ), ARRAY_A );
 		}
 
 		foreach ( $rows as &$row ) {
@@ -279,7 +281,7 @@ class SSAI_Brand_Intelligence {
 		global $wpdb;
 
 		$table   = SSAI_Plugin::table( 'brand_profiles' );
-		$version = 1 + (int) $wpdb->get_var( "SELECT MAX(version) FROM {$table}" );
+		$version = 1 + (int) $wpdb->get_var( $wpdb->prepare( 'SELECT MAX(version) FROM %i', $table ) );
 
 		$wpdb->insert(
 			$table,
@@ -306,7 +308,7 @@ class SSAI_Brand_Intelligence {
 		global $wpdb;
 
 		$table = SSAI_Plugin::table( 'brand_profiles' );
-		$row   = $wpdb->get_row( "SELECT * FROM {$table} ORDER BY id DESC LIMIT 1", ARRAY_A );
+		$row   = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i ORDER BY id DESC LIMIT 1', $table ), ARRAY_A );
 		if ( ! $row ) {
 			return array();
 		}
@@ -328,7 +330,7 @@ class SSAI_Brand_Intelligence {
 
 		$table = SSAI_Plugin::table( 'brand_sources' );
 		$row   = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", absint( $id ) ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, absint( $id ) ),
 			ARRAY_A
 		);
 
@@ -382,7 +384,13 @@ class SSAI_Brand_Intelligence {
 			if ( ! taxonomy_exists( $taxonomy ) ) {
 				return new WP_Error( 'ssai_brand_taxonomy_missing', __( 'Selected taxonomy was not found.', 'sociaspark-ai-social-poster' ), array( 'status' => 404 ) );
 			}
-			$terms = get_terms( array( 'taxonomy' => $taxonomy, 'hide_empty' => false, 'number' => 100 ) );
+			$terms = get_terms(
+				array(
+					'taxonomy'   => $taxonomy,
+					'hide_empty' => false,
+					'number'     => 100,
+				)
+			);
 			if ( is_wp_error( $terms ) ) {
 				return $terms;
 			}

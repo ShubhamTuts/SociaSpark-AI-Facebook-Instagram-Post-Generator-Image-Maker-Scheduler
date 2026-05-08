@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Encrypts and decrypts sensitive values.
  */
 class SSAI_Encryption {
+	// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode, WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Base64 is used here for binary-safe storage of encrypted payload parts.
 	/**
 	 * Encrypts plaintext.
 	 *

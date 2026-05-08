@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Idea Bank service.
  */
 class SSAI_Idea_Bank {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This service manages plugin-owned custom tables directly.
 	/**
 	 * Creates an idea.
 	 *
@@ -53,9 +54,9 @@ class SSAI_Idea_Bank {
 
 		$table = SSAI_Plugin::table( 'ideas' );
 		if ( $status ) {
-			return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY id DESC", sanitize_key( $status ) ), ARRAY_A );
+			return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i WHERE status = %s ORDER BY id DESC', $table, sanitize_key( $status ) ), ARRAY_A );
 		}
 
-		return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY id DESC", ARRAY_A );
+		return $wpdb->get_results( $wpdb->prepare( 'SELECT * FROM %i ORDER BY id DESC', $table ), ARRAY_A );
 	}
 }

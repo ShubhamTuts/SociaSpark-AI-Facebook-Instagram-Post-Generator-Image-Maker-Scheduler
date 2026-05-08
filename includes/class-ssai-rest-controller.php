@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Registers and handles SociaSpark REST routes.
  */
 class SSAI_REST_Controller {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This controller persists and reads plugin-owned custom tables directly.
 	/**
 	 * Registers routes.
 	 *
@@ -117,11 +118,11 @@ class SSAI_REST_Controller {
 		$posts       = SSAI_Plugin::table( 'posts' );
 		$jobs        = SSAI_Plugin::table( 'platform_jobs' );
 		$conns       = SSAI_Plugin::table( 'connections' );
-		$drafts      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$posts} WHERE status = 'draft'" );
-		$scheduled   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$posts} WHERE status = 'scheduled'" );
-		$published   = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$posts} WHERE status = 'published'" );
-		$failed      = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$jobs} WHERE status = 'failed'" );
-		$connections = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$conns} WHERE status = 'connected'" );
+		$drafts      = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status = %s', $posts, 'draft' ) );
+		$scheduled   = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status = %s', $posts, 'scheduled' ) );
+		$published   = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status = %s', $posts, 'published' ) );
+		$failed      = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status = %s', $jobs, 'failed' ) );
+		$connections = (int) $wpdb->get_var( $wpdb->prepare( 'SELECT COUNT(*) FROM %i WHERE status = %s', $conns, 'connected' ) );
 
 		return rest_ensure_response(
 			array(
@@ -252,7 +253,7 @@ class SSAI_REST_Controller {
 		global $wpdb;
 
 		$ideas = SSAI_Plugin::table( 'ideas' );
-		$idea  = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$ideas} WHERE id = %d", absint( $request['id'] ) ), ARRAY_A );
+		$idea  = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $ideas, absint( $request['id'] ) ), ARRAY_A );
 		if ( ! $idea ) {
 			return new WP_Error( 'ssai_idea_not_found', __( 'Idea was not found.', 'sociaspark-ai-social-poster' ), array( 'status' => 404 ) );
 		}
@@ -528,7 +529,7 @@ class SSAI_REST_Controller {
 			return $validation;
 		}
 
-		$job_ids   = $this->create_jobs( $post_id, $data['jobs'] );
+		$job_ids = $this->create_jobs( $post_id, $data['jobs'] );
 		if ( empty( $job_ids ) ) {
 			return new WP_Error( 'ssai_jobs_invalid', __( 'No valid platform jobs could be created. Choose a connected Facebook or Instagram account.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 		}
@@ -549,10 +550,15 @@ class SSAI_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function jobs( $request ) {
+		$limit = absint( $request->get_param( 'limit' ) );
+		if ( $limit < 1 ) {
+			$limit = 100;
+		}
+
 		return rest_ensure_response(
 			$this->job_rows(
 				sanitize_key( $request->get_param( 'status' ) ),
-				absint( $request->get_param( 'limit' ) ?: 100 )
+				$limit
 			)
 		);
 	}
@@ -593,7 +599,12 @@ class SSAI_REST_Controller {
 	 * @return WP_REST_Response
 	 */
 	public function logs( $request ) {
-		return rest_ensure_response( SSAI_Logger::recent( absint( $request->get_param( 'limit' ) ?: 50 ) ) );
+		$limit = absint( $request->get_param( 'limit' ) );
+		if ( $limit < 1 ) {
+			$limit = 50;
+		}
+
+		return rest_ensure_response( SSAI_Logger::recent( $limit ) );
 	}
 
 	/**
@@ -654,7 +665,10 @@ class SSAI_REST_Controller {
 			return new WP_Error( 'ssai_brand_upload_missing', __( 'Choose a brand source file to upload.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 		}
 
-		$title  = sanitize_text_field( $request->get_param( 'title' ) ?: ( $file['name'] ?? __( 'Uploaded brand source', 'sociaspark-ai-social-poster' ) ) );
+		$title = sanitize_text_field( $request->get_param( 'title' ) );
+		if ( '' === $title ) {
+			$title = sanitize_text_field( $file['name'] ?? __( 'Uploaded brand source', 'sociaspark-ai-social-poster' ) );
+		}
 		$result = SSAI_Brand_Intelligence::add_uploaded_file( $file, $title );
 		return is_wp_error( $result ) ? $result : rest_ensure_response( $result );
 	}
@@ -694,7 +708,15 @@ class SSAI_REST_Controller {
 			$profile = SSAI_Brand_Intelligence::save_profile( SSAI_Brand_Intelligence::build_local_profile( $sources ), $source_ids, 'local' );
 		}
 
-		SSAI_Logger::log( 'info', 'ssai_brand_profile_built', 'Brand Intelligence Profile created.', array( 'source_count' => count( $sources ), 'mode' => $use_ai ? 'ai' : 'local' ) );
+		SSAI_Logger::log(
+			'info',
+			'ssai_brand_profile_built',
+			'Brand Intelligence Profile created.',
+			array(
+				'source_count' => count( $sources ),
+				'mode'         => $use_ai ? 'ai' : 'local',
+			)
+		);
 		return rest_ensure_response( $profile );
 	}
 
@@ -777,7 +799,7 @@ class SSAI_REST_Controller {
 		global $wpdb;
 
 		$table = SSAI_Plugin::table( 'posts' );
-		return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", absint( $id ) ), ARRAY_A );
+		return $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $table, absint( $id ) ), ARRAY_A );
 	}
 
 	/**
@@ -796,12 +818,12 @@ class SSAI_REST_Controller {
 
 		if ( $status ) {
 			$rows = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$table} WHERE status = %s ORDER BY id DESC LIMIT %d", sanitize_key( $status ), $limit ),
+				$wpdb->prepare( 'SELECT * FROM %i WHERE status = %s ORDER BY id DESC LIMIT %d', $table, sanitize_key( $status ), $limit ),
 				ARRAY_A
 			);
 		} else {
 			$rows = $wpdb->get_results(
-				$wpdb->prepare( "SELECT * FROM {$table} ORDER BY id DESC LIMIT %d", $limit ),
+				$wpdb->prepare( 'SELECT * FROM %i ORDER BY id DESC LIMIT %d', $table, $limit ),
 				ARRAY_A
 			);
 		}
@@ -840,7 +862,10 @@ class SSAI_REST_Controller {
 				continue;
 			}
 
-			$scheduled = $this->normalize_site_datetime( $job['scheduled_at'] ?? '' ) ?: $now;
+			$scheduled = $this->normalize_site_datetime( $job['scheduled_at'] ?? '' );
+			if ( null === $scheduled ) {
+				$scheduled = $now;
+			}
 			$wpdb->insert(
 				$table,
 				array(
@@ -872,7 +897,7 @@ class SSAI_REST_Controller {
 
 		$table = SSAI_Plugin::table( 'platform_jobs' );
 		return $wpdb->get_results(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE ssai_post_id = %d ORDER BY scheduled_at ASC, id ASC", absint( $post_id ) ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE ssai_post_id = %d ORDER BY scheduled_at ASC, id ASC', $table, absint( $post_id ) ),
 			ARRAY_A
 		);
 	}
@@ -894,7 +919,9 @@ class SSAI_REST_Controller {
 		if ( $status ) {
 			return $wpdb->get_results(
 				$wpdb->prepare(
-					"SELECT j.*, p.title, p.media_id, p.media_url FROM {$jobs} j INNER JOIN {$posts} p ON p.id = j.ssai_post_id WHERE j.status = %s ORDER BY j.scheduled_at DESC, j.id DESC LIMIT %d",
+					'SELECT j.*, p.title, p.media_id, p.media_url FROM %i j INNER JOIN %i p ON p.id = j.ssai_post_id WHERE j.status = %s ORDER BY j.scheduled_at DESC, j.id DESC LIMIT %d',
+					$jobs,
+					$posts,
 					sanitize_key( $status ),
 					$limit
 				),
@@ -904,7 +931,9 @@ class SSAI_REST_Controller {
 
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT j.*, p.title, p.media_id, p.media_url FROM {$jobs} j INNER JOIN {$posts} p ON p.id = j.ssai_post_id ORDER BY j.scheduled_at DESC, j.id DESC LIMIT %d",
+				'SELECT j.*, p.title, p.media_id, p.media_url FROM %i j INNER JOIN %i p ON p.id = j.ssai_post_id ORDER BY j.scheduled_at DESC, j.id DESC LIMIT %d',
+				$jobs,
+				$posts,
 				$limit
 			),
 			ARRAY_A
@@ -920,9 +949,9 @@ class SSAI_REST_Controller {
 		$settings = SSAI_Settings::public_settings();
 
 		return array(
-			'openai' => ! empty( $settings['openai_api_key_configured'] ),
-			'gemini' => ! empty( $settings['gemini_api_key_configured'] ),
-			'claude' => ! empty( $settings['claude_api_key_configured'] ),
+			'openai'           => ! empty( $settings['openai_api_key_configured'] ),
+			'gemini'           => ! empty( $settings['gemini_api_key_configured'] ),
+			'claude'           => ! empty( $settings['claude_api_key_configured'] ),
 			'default_provider' => $settings['default_provider'] ?? 'openai',
 		);
 	}
@@ -945,17 +974,29 @@ class SSAI_REST_Controller {
 		$actions     = array();
 
 		if ( empty( $settings['openai'] ) && empty( $settings['gemini'] ) && empty( $settings['claude'] ) ) {
-			$actions[] = array( 'id' => 'settings', 'label' => __( 'Add at least one AI provider key', 'sociaspark-ai-social-poster' ) );
+			$actions[] = array(
+				'id'    => 'settings',
+				'label' => __( 'Add at least one AI provider key', 'sociaspark-ai-social-poster' ),
+			);
 		}
 		if ( empty( $connected ) ) {
-			$actions[] = array( 'id' => 'connections', 'label' => __( 'Connect a Facebook Page or Instagram account', 'sociaspark-ai-social-poster' ) );
+			$actions[] = array(
+				'id'    => 'connections',
+				'label' => __( 'Connect a Facebook Page or Instagram account', 'sociaspark-ai-social-poster' ),
+			);
 		}
 		if ( empty( $brand ) ) {
-			$actions[] = array( 'id' => 'brand', 'label' => __( 'Build Brand Intelligence from approved sources', 'sociaspark-ai-social-poster' ) );
+			$actions[] = array(
+				'id'    => 'brand',
+				'label' => __( 'Build Brand Intelligence from approved sources', 'sociaspark-ai-social-poster' ),
+			);
 		}
 
 		if ( empty( $actions ) ) {
-			$actions[] = array( 'id' => 'create', 'label' => __( 'Create and schedule the next social post', 'sociaspark-ai-social-poster' ) );
+			$actions[] = array(
+				'id'    => 'create',
+				'label' => __( 'Create and schedule the next social post', 'sociaspark-ai-social-poster' ),
+			);
 		}
 
 		return $actions;
@@ -976,7 +1017,7 @@ class SSAI_REST_Controller {
 			SSAI_Plugin::table( 'posts' ),
 			array(
 				'status'       => sanitize_key( $status ),
-				'scheduled_at' => $scheduled_at ?: null,
+				'scheduled_at' => '' !== $scheduled_at ? $scheduled_at : null,
 				'updated_at'   => current_time( 'mysql' ),
 			),
 			array( 'id' => absint( $post_id ) )
@@ -1037,7 +1078,7 @@ class SSAI_REST_Controller {
 			}
 
 			if ( 'facebook' === $platform ) {
-				$caption = trim( (string) ( $post['content_facebook'] ?: $post['content_long'] ) );
+				$caption = trim( (string) ( ! empty( $post['content_facebook'] ) ? $post['content_facebook'] : $post['content_long'] ) );
 				if ( '' === $caption && '' === $this->post_media_url( $post ) ) {
 					return new WP_Error( 'ssai_facebook_content_required', __( 'Facebook publishing requires post copy or an attached image.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 				}

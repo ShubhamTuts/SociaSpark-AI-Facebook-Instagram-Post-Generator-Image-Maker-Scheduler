@@ -78,7 +78,14 @@ class SSAI_Gemini_Provider implements SSAI_AI_Provider_Interface {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_gemini_request_failed', __( 'Gemini request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_gemini_request_failed',
+				__( 'Gemini request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
@@ -136,7 +143,15 @@ class SSAI_Gemini_Provider implements SSAI_AI_Provider_Interface {
 	 */
 	private function log_provider_error( $body, $status ) {
 		if ( is_array( $body ) && ! empty( $body['error']['message'] ) ) {
-			SSAI_Logger::log( 'warning', 'ssai_gemini_error', 'Provider error', array( 'status' => $status, 'message' => $body['error']['message'] ) );
+			SSAI_Logger::log(
+				'warning',
+				'ssai_gemini_error',
+				'Provider error',
+				array(
+					'status'  => $status,
+					'message' => $body['error']['message'],
+				)
+			);
 		}
 	}
 }

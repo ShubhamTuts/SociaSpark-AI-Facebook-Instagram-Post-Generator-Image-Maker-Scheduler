@@ -55,24 +55,54 @@ class SSAI_AI_Manager {
 				),
 				'text'     => array(
 					'openai' => array(
-						array( 'id' => 'gpt-5.5', 'label' => 'GPT-5.5 - best quality' ),
-						array( 'id' => 'gpt-5.4-mini', 'label' => 'GPT-5.4 mini - balanced' ),
-						array( 'id' => 'gpt-5.4-nano', 'label' => 'GPT-5.4 nano - low cost' ),
+						array(
+							'id'    => 'gpt-5.5',
+							'label' => 'GPT-5.5 - best quality',
+						),
+						array(
+							'id'    => 'gpt-5.4-mini',
+							'label' => 'GPT-5.4 mini - balanced',
+						),
+						array(
+							'id'    => 'gpt-5.4-nano',
+							'label' => 'GPT-5.4 nano - low cost',
+						),
 					),
 					'gemini' => array(
-						array( 'id' => 'gemini-2.5-flash', 'label' => 'Gemini 2.5 Flash' ),
-						array( 'id' => 'gemini-2.5-pro', 'label' => 'Gemini 2.5 Pro' ),
+						array(
+							'id'    => 'gemini-2.5-flash',
+							'label' => 'Gemini 2.5 Flash',
+						),
+						array(
+							'id'    => 'gemini-2.5-pro',
+							'label' => 'Gemini 2.5 Pro',
+						),
 					),
 					'claude' => array(
-						array( 'id' => 'claude-sonnet-4-6', 'label' => 'Claude Sonnet 4.6' ),
-						array( 'id' => 'claude-opus-4-7', 'label' => 'Claude Opus 4.7' ),
-						array( 'id' => 'claude-haiku-4-5', 'label' => 'Claude Haiku 4.5' ),
+						array(
+							'id'    => 'claude-sonnet-4-6',
+							'label' => 'Claude Sonnet 4.6',
+						),
+						array(
+							'id'    => 'claude-opus-4-7',
+							'label' => 'Claude Opus 4.7',
+						),
+						array(
+							'id'    => 'claude-haiku-4-5',
+							'label' => 'Claude Haiku 4.5',
+						),
 					),
 				),
 				'image'    => array(
 					'openai' => array(
-						array( 'id' => 'gpt-image-2', 'label' => 'GPT Image 2 - best quality' ),
-						array( 'id' => 'gpt-image-1.5', 'label' => 'GPT Image 1.5 - compatibility' ),
+						array(
+							'id'    => 'gpt-image-2',
+							'label' => 'GPT Image 2 - best quality',
+						),
+						array(
+							'id'    => 'gpt-image-1.5',
+							'label' => 'GPT Image 1.5 - compatibility',
+						),
 					),
 				),
 			)
@@ -92,7 +122,9 @@ class SSAI_AI_Manager {
 
 		if ( 'image' === $mode ) {
 			$provider = 'openai';
-			$model    = $model ?: SSAI_Settings::get( 'default_image_model', SSAI_Settings::get( 'openai_image_model', 'gpt-image-2' ) );
+			if ( '' === $model ) {
+				$model = SSAI_Settings::get( 'default_image_model', SSAI_Settings::get( 'openai_image_model', 'gpt-image-2' ) );
+			}
 		}
 
 		$instance = $this->provider( $provider );
@@ -119,7 +151,7 @@ class SSAI_AI_Manager {
 		$result = $instance->generate_text(
 			'Return exactly this JSON: {"ok":true,"message":"provider ready"}',
 			array(
-				'model'      => $model ?: $this->default_text_model( $provider ),
+				'model'      => '' !== $model ? $model : $this->default_text_model( $provider ),
 				'system'     => 'You are checking API connectivity. Return compact valid JSON only.',
 				'json'       => true,
 				'max_tokens' => 80,
@@ -133,7 +165,7 @@ class SSAI_AI_Manager {
 		return array(
 			'ok'       => true,
 			'provider' => $provider,
-			'model'    => $model ?: $this->default_text_model( $provider ),
+			'model'    => '' !== $model ? $model : $this->default_text_model( $provider ),
 			'message'  => __( 'Text provider responded successfully.', 'sociaspark-ai-social-poster' ),
 		);
 	}
@@ -312,8 +344,10 @@ class SSAI_AI_Manager {
 			return $rate;
 		}
 
-		$provider_key = $provider_key ?: SSAI_Settings::get( 'default_text_provider', 'openai' );
-		$provider     = $this->provider( $provider_key );
+		if ( '' === $provider_key ) {
+			$provider_key = SSAI_Settings::get( 'default_text_provider', 'openai' );
+		}
+		$provider = $this->provider( $provider_key );
 		if ( is_wp_error( $provider ) ) {
 			return $provider;
 		}
@@ -564,7 +598,10 @@ class SSAI_AI_Manager {
 								'caption'           => array( 'type' => 'string' ),
 								'facebook_caption'  => array( 'type' => 'string' ),
 								'instagram_caption' => array( 'type' => 'string' ),
-								'hashtags'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+								'hashtags'          => array(
+									'type'  => 'array',
+									'items' => array( 'type' => 'string' ),
+								),
 								'cta'               => array( 'type' => 'string' ),
 								'angle'             => array( 'type' => 'string' ),
 								'platform_notes'    => array( 'type' => 'string' ),
@@ -590,13 +627,28 @@ class SSAI_AI_Manager {
 				'type'       => 'object',
 				'properties' => array(
 					'hook'                  => array( 'type' => 'string' ),
-					'scene_by_scene_script' => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'on_screen_text'        => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'scene_by_scene_script' => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'on_screen_text'        => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'voiceover'             => array( 'type' => 'string' ),
-					'b_roll_ideas'          => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'b_roll_ideas'          => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'caption'               => array( 'type' => 'string' ),
-					'hashtags'              => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'shot_list'             => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'hashtags'              => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'shot_list'             => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'editing_notes'         => array( 'type' => 'string' ),
 				),
 				'required'   => array( 'hook', 'voiceover', 'caption' ),
@@ -617,8 +669,14 @@ class SSAI_AI_Manager {
 				'properties' => array(
 					'facebook_caption'  => array( 'type' => 'string' ),
 					'instagram_caption' => array( 'type' => 'string' ),
-					'hooks'             => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'cta_options'       => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'hooks'             => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'cta_options'       => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'image_prompt'      => array( 'type' => 'string' ),
 					'video_script_idea' => array( 'type' => 'string' ),
 				),
@@ -639,16 +697,40 @@ class SSAI_AI_Manager {
 				'type'       => 'object',
 				'properties' => array(
 					'voice'               => array( 'type' => 'object' ),
-					'audience_segments'   => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'offers'              => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'proof_points'        => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'banned_phrases'      => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'approved_phrases'    => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'audience_segments'   => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'offers'              => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'proof_points'        => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'banned_phrases'      => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'approved_phrases'    => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'cta_style'           => array( 'type' => 'string' ),
-					'hashtag_banks'       => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'hashtag_banks'       => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'visual_direction'    => array( 'type' => 'object' ),
-					'content_pillars'     => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
-					'compliance_cautions' => array( 'type' => 'array', 'items' => array( 'type' => 'string' ) ),
+					'content_pillars'     => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
+					'compliance_cautions' => array(
+						'type'  => 'array',
+						'items' => array( 'type' => 'string' ),
+					),
 					'platform_rules'      => array( 'type' => 'object' ),
 				),
 			),

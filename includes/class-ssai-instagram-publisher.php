@@ -26,7 +26,14 @@ class SSAI_Instagram_Publisher {
 		$image_url  = $this->media_url( $post );
 
 		if ( ! $image_url || 'https' !== wp_parse_url( $image_url, PHP_URL_SCHEME ) ) {
-			return new WP_Error( 'ssai_instagram_requires_https_image', __( 'Instagram publishing requires a public HTTPS image URL.', 'sociaspark-ai-social-poster' ), array( 'status' => 400, 'transient' => false ) );
+			return new WP_Error(
+				'ssai_instagram_requires_https_image',
+				__( 'Instagram publishing requires a public HTTPS image URL.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 400,
+					'transient' => false,
+				)
+			);
 		}
 
 		$version = sanitize_text_field( SSAI_Settings::get( 'meta_graph_version', 'v24.0' ) );
@@ -48,7 +55,14 @@ class SSAI_Instagram_Publisher {
 
 		$creation_id = $container['id'] ?? '';
 		if ( '' === $creation_id ) {
-			return new WP_Error( 'ssai_instagram_no_container', __( 'Instagram did not return a media container.', 'sociaspark-ai-social-poster' ), array( 'status' => 502, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_instagram_no_container',
+				__( 'Instagram did not return a media container.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 502,
+					'transient' => true,
+				)
+			);
 		}
 
 		return $this->post_to_meta(
@@ -96,17 +110,35 @@ class SSAI_Instagram_Publisher {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_meta_request_failed', __( 'Meta publishing request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_meta_request_failed',
+				__( 'Meta publishing request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {
-			SSAI_Logger::log( 'warning', 'ssai_' . $event . '_error', 'Meta publish error', array( 'status' => $status, 'body' => $data ) );
+			SSAI_Logger::log(
+				'warning',
+				'ssai_' . $event . '_error',
+				'Meta publish error',
+				array(
+					'status' => $status,
+					'body'   => $data,
+				)
+			);
 			return new WP_Error(
 				'ssai_meta_publish_error',
 				__( 'Meta returned a publishing error. Check account permissions and token status.', 'sociaspark-ai-social-poster' ),
-				array( 'status' => $status, 'transient' => in_array( absint( $status ), array( 408, 409, 429, 500, 502, 503, 504 ), true ) )
+				array(
+					'status'    => $status,
+					'transient' => in_array( absint( $status ), array( 408, 409, 429, 500, 502, 503, 504 ), true ),
+				)
 			);
 		}
 

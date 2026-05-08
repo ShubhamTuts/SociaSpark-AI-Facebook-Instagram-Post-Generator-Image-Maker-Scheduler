@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Writes operational logs without secrets.
  */
 class SSAI_Logger {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This service writes and reads plugin-owned log tables directly.
 	/**
 	 * Writes a log entry.
 	 *
@@ -55,7 +56,8 @@ class SSAI_Logger {
 
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} ORDER BY id DESC LIMIT %d",
+				'SELECT * FROM %i ORDER BY id DESC LIMIT %d',
+				$table,
 				$limit
 			),
 			ARRAY_A

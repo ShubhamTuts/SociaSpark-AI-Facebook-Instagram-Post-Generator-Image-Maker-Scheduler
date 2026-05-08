@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Processes scheduled publishing jobs.
  */
 class SSAI_Scheduler {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- The scheduler must atomically query and update plugin-owned custom job tables.
 	/**
 	 * Adds cron interval.
 	 *
@@ -68,7 +69,7 @@ class SSAI_Scheduler {
 		$jobs_table  = SSAI_Plugin::table( 'platform_jobs' );
 		$posts_table = SSAI_Plugin::table( 'posts' );
 		$post        = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$posts_table} WHERE id = %d", absint( $job['ssai_post_id'] ) ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d', $posts_table, absint( $job['ssai_post_id'] ) ),
 			ARRAY_A
 		);
 
@@ -112,7 +113,15 @@ class SSAI_Scheduler {
 		);
 
 		$this->refresh_post_status( (int) $job['ssai_post_id'] );
-		SSAI_Logger::log( 'info', 'ssai_publish_success', 'Published scheduled job.', array( 'job_id' => $job['id'], 'platform' => $job['platform'] ) );
+		SSAI_Logger::log(
+			'info',
+			'ssai_publish_success',
+			'Published scheduled job.',
+			array(
+				'job_id'   => $job['id'],
+				'platform' => $job['platform'],
+			)
+		);
 		do_action( 'ssai_pro_after_publish', $job, $post, $connection, $result );
 
 		return $result;
@@ -131,13 +140,14 @@ class SSAI_Scheduler {
 
 		return $wpdb->get_col(
 			$wpdb->prepare(
-				"SELECT id FROM {$table}
+				"SELECT id FROM %i
 				WHERE status IN ('queued', 'scheduled')
 				AND scheduled_at <= %s
 				AND (next_attempt_at IS NULL OR next_attempt_at <= %s)
 				AND (lock_token IS NULL OR locked_at < DATE_SUB(%s, INTERVAL 10 MINUTE))
 				ORDER BY scheduled_at ASC
 				LIMIT 20",
+				$table,
 				$now,
 				$now,
 				$now
@@ -160,11 +170,12 @@ class SSAI_Scheduler {
 
 		$updated = $wpdb->query(
 			$wpdb->prepare(
-				"UPDATE {$table}
+				"UPDATE %i
 				SET status = 'publishing', lock_token = %s, locked_at = %s, attempts = attempts + 1, last_attempt_at = %s, updated_at = %s
 				WHERE id = %d
 				AND status IN ('queued', 'scheduled')
 				AND (lock_token IS NULL OR locked_at < DATE_SUB(%s, INTERVAL 10 MINUTE))",
+				$table,
 				$token,
 				$now,
 				$now,
@@ -179,7 +190,7 @@ class SSAI_Scheduler {
 		}
 
 		return $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d AND lock_token = %s", absint( $job_id ), $token ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d AND lock_token = %s', $table, absint( $job_id ), $token ),
 			ARRAY_A
 		);
 	}
@@ -222,9 +233,25 @@ class SSAI_Scheduler {
 		);
 
 		$this->refresh_post_status( (int) $job['ssai_post_id'] );
-		SSAI_Logger::log( 'error', 'ssai_publish_failed', $message, array( 'job_id' => $job['id'], 'platform' => $job['platform'], 'retrying' => 'scheduled' === $status ) );
+		SSAI_Logger::log(
+			'error',
+			'ssai_publish_failed',
+			$message,
+			array(
+				'job_id'   => $job['id'],
+				'platform' => $job['platform'],
+				'retrying' => 'scheduled' === $status,
+			)
+		);
 
-		return new WP_Error( $code, $message, array( 'status' => 'scheduled' === $status ? 202 : 500, 'transient' => $transient ) );
+		return new WP_Error(
+			$code,
+			$message,
+			array(
+				'status'    => 'scheduled' === $status ? 202 : 500,
+				'transient' => $transient,
+			)
+		);
 	}
 
 	/**
@@ -239,7 +266,7 @@ class SSAI_Scheduler {
 		$jobs_table  = SSAI_Plugin::table( 'platform_jobs' );
 		$posts_table = SSAI_Plugin::table( 'posts' );
 		$statuses    = $wpdb->get_col(
-			$wpdb->prepare( "SELECT status FROM {$jobs_table} WHERE ssai_post_id = %d", absint( $post_id ) )
+			$wpdb->prepare( 'SELECT status FROM %i WHERE ssai_post_id = %d', $jobs_table, absint( $post_id ) )
 		);
 
 		if ( empty( $statuses ) ) {

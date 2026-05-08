@@ -130,7 +130,14 @@ class SSAI_OpenAI_Provider implements SSAI_AI_Provider_Interface {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_openai_image_request_failed', __( 'OpenAI image request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_openai_image_request_failed',
+				__( 'OpenAI image request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
@@ -173,7 +180,11 @@ class SSAI_OpenAI_Provider implements SSAI_AI_Provider_Interface {
 			return new WP_Error( 'ssai_openai_missing_key', __( 'OpenAI API key is not configured.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 		}
 
-		$model = sanitize_text_field( $model ?: ( 'image' === $mode ? SSAI_Settings::get( 'default_image_model', 'gpt-image-2' ) : SSAI_Settings::get( 'default_text_model', 'gpt-5.4-mini' ) ) );
+		if ( '' === $model ) {
+			$model = 'image' === $mode ? SSAI_Settings::get( 'default_image_model', 'gpt-image-2' ) : SSAI_Settings::get( 'default_text_model', 'gpt-5.4-mini' );
+		}
+
+		$model    = sanitize_text_field( $model );
 		$response = wp_remote_get(
 			$this->base . '/models/' . rawurlencode( $model ),
 			array(
@@ -185,7 +196,14 @@ class SSAI_OpenAI_Provider implements SSAI_AI_Provider_Interface {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_openai_model_request_failed', __( 'OpenAI model check failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_openai_model_request_failed',
+				__( 'OpenAI model check failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
@@ -207,7 +225,14 @@ class SSAI_OpenAI_Provider implements SSAI_AI_Provider_Interface {
 	 */
 	private function parse_text_response( $response, $provider, $model = '' ) {
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_' . $provider . '_request_failed', __( 'AI provider request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_' . $provider . '_request_failed',
+				__( 'AI provider request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
@@ -248,11 +273,13 @@ class SSAI_OpenAI_Provider implements SSAI_AI_Provider_Interface {
 	 * @param array|null $body Response body.
 	 * @param string     $code Error code.
 	 * @param int        $status HTTP status.
+	 * @param string     $model Model name.
+	 * @param string     $mode Endpoint mode.
 	 * @return WP_Error
 	 */
 	private function provider_error( $body, $code, $status, $model = '', $mode = '' ) {
-		$details = $this->safe_provider_error_details( $body );
-		$message = $details['message'] ? $details['message'] : __( 'OpenAI returned an error. Check credentials, model access, and provider permissions.', 'sociaspark-ai-social-poster' );
+		$details   = $this->safe_provider_error_details( $body );
+		$message   = $details['message'] ? $details['message'] : __( 'OpenAI returned an error. Check credentials, model access, and provider permissions.', 'sociaspark-ai-social-poster' );
 		$transient = in_array( absint( $status ), array( 408, 409, 429, 500, 502, 503, 504 ), true );
 
 		SSAI_Logger::log(

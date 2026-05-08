@@ -12,7 +12,9 @@
 	<config name="testVersion" value="8.0-"/>
 	<rule ref="WordPress.WP.I18n">
 		<properties>
-			<property name="text_domain" type="array" value="sociaspark-ai-social-poster"/>
+			<property name="text_domain" type="array">
+				<element value="sociaspark-ai-social-poster"/>
+			</property>
 		</properties>
 	</rule>
 </ruleset>

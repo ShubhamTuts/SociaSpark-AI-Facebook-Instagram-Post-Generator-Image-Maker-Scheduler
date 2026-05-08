@@ -60,8 +60,8 @@ final class SSAI_Plugin {
 	private function __construct() {
 		$this->load_dependencies();
 
-		$this->admin    = new SSAI_Admin();
-		$this->rest     = new SSAI_REST_Controller();
+		$this->admin     = new SSAI_Admin();
+		$this->rest      = new SSAI_REST_Controller();
 		$this->scheduler = new SSAI_Scheduler();
 
 		$this->register_hooks();
@@ -114,7 +114,7 @@ final class SSAI_Plugin {
 		add_action( 'admin_menu', array( $this->admin, 'register_menu' ) );
 		add_action( 'admin_enqueue_scripts', array( $this->admin, 'enqueue_assets' ) );
 		add_action( 'rest_api_init', array( $this->rest, 'register_routes' ) );
-		add_filter( 'cron_schedules', array( $this->scheduler, 'add_cron_interval' ) );
+		add_filter( 'cron_schedules', array( $this->scheduler, 'add_cron_interval' ) ); // phpcs:ignore WordPress.WP.CronInterval.ChangeDetected -- Interval is registered in SSAI_Scheduler::add_cron_interval().
 		add_action( 'ssai_process_scheduled_jobs', array( $this->scheduler, 'process_due_jobs' ) );
 	}
 

@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Calendar query service.
  */
 class SSAI_Calendar {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This service reads plugin-owned custom tables for admin calendar views.
 	/**
 	 * Gets scheduled and published jobs for calendar.
 	 *
@@ -25,16 +26,26 @@ class SSAI_Calendar {
 
 		$jobs  = SSAI_Plugin::table( 'platform_jobs' );
 		$posts = SSAI_Plugin::table( 'posts' );
-		$from  = self::normalize_site_datetime( $from ) ?: wp_date( 'Y-m-d H:i:s', strtotime( '-30 days' ), wp_timezone() );
-		$to    = self::normalize_site_datetime( $to ) ?: wp_date( 'Y-m-d H:i:s', strtotime( '+90 days' ), wp_timezone() );
+		$from  = self::normalize_site_datetime( $from );
+		$to    = self::normalize_site_datetime( $to );
+
+		if ( null === $from ) {
+			$from = wp_date( 'Y-m-d H:i:s', strtotime( '-30 days' ), wp_timezone() );
+		}
+
+		if ( null === $to ) {
+			$to = wp_date( 'Y-m-d H:i:s', strtotime( '+90 days' ), wp_timezone() );
+		}
 
 		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT j.*, p.title, p.media_id, p.media_url FROM {$jobs} j INNER JOIN {$posts} p ON p.id = j.ssai_post_id WHERE j.scheduled_at BETWEEN %s AND %s ORDER BY j.scheduled_at ASC",
+				'SELECT j.*, p.title, p.media_id, p.media_url FROM %i j INNER JOIN %i p ON p.id = j.ssai_post_id WHERE j.scheduled_at BETWEEN %s AND %s ORDER BY j.scheduled_at ASC',
+				$jobs,
+				$posts,
 				$from,
 				$to
 			),
-				ARRAY_A
+			ARRAY_A
 		);
 	}
 

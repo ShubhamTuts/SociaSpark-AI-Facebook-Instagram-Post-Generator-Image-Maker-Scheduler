@@ -80,17 +80,36 @@ class SSAI_Facebook_Publisher {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_meta_request_failed', __( 'Meta publishing request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_meta_request_failed',
+				__( 'Meta publishing request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$data   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {
-			SSAI_Logger::log( 'warning', 'ssai_meta_publish_error', 'Meta publish error', array( 'platform' => $platform, 'status' => $status, 'body' => $data ) );
+			SSAI_Logger::log(
+				'warning',
+				'ssai_meta_publish_error',
+				'Meta publish error',
+				array(
+					'platform' => $platform,
+					'status'   => $status,
+					'body'     => $data,
+				)
+			);
 			return new WP_Error(
 				'ssai_meta_publish_error',
 				__( 'Meta returned a publishing error. Check account permissions and token status.', 'sociaspark-ai-social-poster' ),
-				array( 'status' => $status, 'transient' => in_array( absint( $status ), array( 408, 409, 429, 500, 502, 503, 504 ), true ) )
+				array(
+					'status'    => $status,
+					'transient' => in_array( absint( $status ), array( 408, 409, 429, 500, 502, 503, 504 ), true ),
+				)
 			);
 		}
 

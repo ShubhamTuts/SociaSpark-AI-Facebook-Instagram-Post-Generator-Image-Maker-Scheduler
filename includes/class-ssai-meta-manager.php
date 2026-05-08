@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Stores Meta platform connections.
  */
 class SSAI_Meta_Manager {
+	// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- This service manages plugin-owned custom tables directly.
 	/**
 	 * Saves or updates a connection.
 	 *
@@ -52,7 +53,7 @@ class SSAI_Meta_Manager {
 		);
 
 		$existing_id = $wpdb->get_var(
-			$wpdb->prepare( "SELECT id FROM {$table} WHERE platform = %s AND account_id = %s LIMIT 1", $platform, $account_id )
+			$wpdb->prepare( 'SELECT id FROM %i WHERE platform = %s AND account_id = %s LIMIT 1', $table, $platform, $account_id )
 		);
 
 		if ( $existing_id ) {
@@ -104,14 +105,30 @@ class SSAI_Meta_Manager {
 
 		$response = wp_remote_get( $url, array( 'timeout' => 30 ) );
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_meta_test_request_failed', __( 'Meta connection test failed before reaching Meta.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_meta_test_request_failed',
+				__( 'Meta connection test failed before reaching Meta.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
 		$body   = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( $status < 200 || $status >= 300 ) {
 			$message = ! empty( $body['error']['message'] ) ? SSAI_Logger::redact_string( wp_strip_all_tags( (string) $body['error']['message'] ) ) : __( 'Meta returned an account test error.', 'sociaspark-ai-social-poster' );
-			SSAI_Logger::log( 'warning', 'ssai_meta_connection_test_failed', $message, array( 'status' => $status, 'platform' => $connection['platform'], 'account_id' => $connection['account_id'] ) );
+			SSAI_Logger::log(
+				'warning',
+				'ssai_meta_connection_test_failed',
+				$message,
+				array(
+					'status'     => $status,
+					'platform'   => $connection['platform'],
+					'account_id' => $connection['account_id'],
+				)
+			);
 			return new WP_Error(
 				'ssai_meta_connection_test_failed',
 				$message,
@@ -141,7 +158,13 @@ class SSAI_Meta_Manager {
 		global $wpdb;
 
 		$table = SSAI_Plugin::table( 'connections' );
-		$rows  = $wpdb->get_results( "SELECT id, platform, account_label, account_id, token_expires_at, status, meta, created_at, updated_at FROM {$table} ORDER BY id DESC", ARRAY_A );
+		$rows  = $wpdb->get_results(
+			$wpdb->prepare(
+				'SELECT id, platform, account_label, account_id, token_expires_at, status, meta, created_at, updated_at FROM %i ORDER BY id DESC',
+				$table
+			),
+			ARRAY_A
+		);
 
 		foreach ( $rows as &$row ) {
 			$row['meta'] = ! empty( $row['meta'] ) ? json_decode( $row['meta'], true ) : array();
@@ -163,7 +186,8 @@ class SSAI_Meta_Manager {
 		$table = SSAI_Plugin::table( 'connections' );
 		$row   = $wpdb->get_row(
 			$wpdb->prepare(
-				"SELECT * FROM {$table} WHERE platform = %s AND account_id = %s AND status = %s LIMIT 1",
+				'SELECT * FROM %i WHERE platform = %s AND account_id = %s AND status = %s LIMIT 1',
+				$table,
 				sanitize_key( $platform ),
 				sanitize_text_field( $account_id ),
 				'connected'
@@ -172,12 +196,26 @@ class SSAI_Meta_Manager {
 		);
 
 		if ( ! $row ) {
-			return new WP_Error( 'ssai_connection_not_found', __( 'A connected platform account was not found.', 'sociaspark-ai-social-poster' ), array( 'status' => 404, 'transient' => false ) );
+			return new WP_Error(
+				'ssai_connection_not_found',
+				__( 'A connected platform account was not found.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 404,
+					'transient' => false,
+				)
+			);
 		}
 
 		if ( ! empty( $row['token_expires_at'] ) && self::is_past_site_datetime( $row['token_expires_at'] ) ) {
 			self::mark_status( (int) $row['id'], 'expired' );
-			return new WP_Error( 'ssai_connection_expired', __( 'The platform token has expired. Reconnect the account.', 'sociaspark-ai-social-poster' ), array( 'status' => 401, 'transient' => false ) );
+			return new WP_Error(
+				'ssai_connection_expired',
+				__( 'The platform token has expired. Reconnect the account.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 401,
+					'transient' => false,
+				)
+			);
 		}
 
 		$row['access_token'] = SSAI_Encryption::decrypt( (string) $row['encrypted_access_token'] );
@@ -233,7 +271,7 @@ class SSAI_Meta_Manager {
 
 		$table = SSAI_Plugin::table( 'connections' );
 		$row   = $wpdb->get_row(
-			$wpdb->prepare( "SELECT id, platform, account_label, account_id, token_expires_at, status, meta, created_at, updated_at FROM {$table} WHERE id = %d", absint( $id ) ),
+			$wpdb->prepare( 'SELECT id, platform, account_label, account_id, token_expires_at, status, meta, created_at, updated_at FROM %i WHERE id = %d', $table, absint( $id ) ),
 			ARRAY_A
 		);
 
@@ -256,7 +294,7 @@ class SSAI_Meta_Manager {
 
 		$table = SSAI_Plugin::table( 'connections' );
 		$row   = $wpdb->get_row(
-			$wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d LIMIT 1", absint( $id ) ),
+			$wpdb->prepare( 'SELECT * FROM %i WHERE id = %d LIMIT 1', $table, absint( $id ) ),
 			ARRAY_A
 		);
 		if ( ! $row ) {

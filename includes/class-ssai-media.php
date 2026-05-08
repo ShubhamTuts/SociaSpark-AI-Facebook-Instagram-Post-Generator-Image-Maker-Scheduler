@@ -13,6 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Saves generated media into WordPress.
  */
 class SSAI_Media {
+	// phpcs:disable WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Base64 decoding is required to handle provider image payloads and admin canvas data URLs.
 	/**
 	 * Allowed image mimes.
 	 *
@@ -177,7 +178,7 @@ class SSAI_Media {
 		$response = wp_remote_get(
 			$url,
 			array(
-				'timeout' => 30,
+				'timeout'             => 30,
 				'limit_response_size' => 10 * MB_IN_BYTES,
 			)
 		);

@@ -22,11 +22,11 @@ class SSAI_Settings {
 	 */
 	public static function defaults() {
 		return array(
-			'default_provider'          => 'openai',
-			'default_text_provider'     => 'openai',
-			'default_text_model'        => 'gpt-5.4-mini',
-			'default_image_provider'    => 'openai',
-			'default_image_model'       => 'gpt-image-2',
+			'default_provider'         => 'openai',
+			'default_text_provider'    => 'openai',
+			'default_text_model'       => 'gpt-5.4-mini',
+			'default_image_provider'   => 'openai',
+			'default_image_model'      => 'gpt-image-2',
 			'openai_text_model'        => 'gpt-5.4-mini',
 			'openai_image_model'       => 'gpt-image-2',
 			'openai_image_size'        => '1024x1024',
@@ -66,12 +66,12 @@ class SSAI_Settings {
 	 * Gets a public setting value.
 	 *
 	 * @param string $key Setting key.
-	 * @param mixed  $default Default value.
+	 * @param mixed  $fallback Default value.
 	 * @return mixed
 	 */
-	public static function get( $key, $default = null ) {
+	public static function get( $key, $fallback = null ) {
 		$settings = self::all();
-		return array_key_exists( $key, $settings ) ? $settings[ $key ] : $default;
+		return array_key_exists( $key, $settings ) ? $settings[ $key ] : $fallback;
 	}
 
 	/**
@@ -100,7 +100,7 @@ class SSAI_Settings {
 		$settings = self::all();
 		unset( $settings['secrets'] );
 
-		$configured = isset( $settings['configured'] ) && is_array( $settings['configured'] ) ? $settings['configured'] : array();
+		$configured  = isset( $settings['configured'] ) && is_array( $settings['configured'] ) ? $settings['configured'] : array();
 		$secret_keys = self::secret_keys();
 
 		foreach ( $secret_keys as $secret_key ) {
@@ -121,11 +121,11 @@ class SSAI_Settings {
 	public static function update_from_rest( $input ) {
 		$settings   = self::all();
 		$public_map = array(
-			'default_provider'          => 'sanitize_key',
-			'default_text_provider'     => 'sanitize_key',
-			'default_text_model'        => 'sanitize_text_field',
-			'default_image_provider'    => 'sanitize_key',
-			'default_image_model'       => 'sanitize_text_field',
+			'default_provider'         => 'sanitize_key',
+			'default_text_provider'    => 'sanitize_key',
+			'default_text_model'       => 'sanitize_text_field',
+			'default_image_provider'   => 'sanitize_key',
+			'default_image_model'      => 'sanitize_text_field',
 			'openai_text_model'        => 'sanitize_text_field',
 			'openai_image_model'       => 'sanitize_text_field',
 			'openai_image_size'        => 'sanitize_text_field',
@@ -194,7 +194,7 @@ class SSAI_Settings {
 				continue;
 			}
 
-			$settings['secrets'][ $secret_key ]     = SSAI_Encryption::encrypt( $value );
+			$settings['secrets'][ $secret_key ]    = SSAI_Encryption::encrypt( $value );
 			$settings['configured'][ $secret_key ] = true;
 		}
 

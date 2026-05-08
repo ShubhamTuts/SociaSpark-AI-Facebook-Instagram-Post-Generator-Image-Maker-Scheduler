@@ -64,7 +64,14 @@ class SSAI_Claude_Provider implements SSAI_AI_Provider_Interface {
 		);
 
 		if ( is_wp_error( $response ) ) {
-			return new WP_Error( 'ssai_claude_request_failed', __( 'Claude request failed.', 'sociaspark-ai-social-poster' ), array( 'status' => 500, 'transient' => true ) );
+			return new WP_Error(
+				'ssai_claude_request_failed',
+				__( 'Claude request failed.', 'sociaspark-ai-social-poster' ),
+				array(
+					'status'    => 500,
+					'transient' => true,
+				)
+			);
 		}
 
 		$status = wp_remote_retrieve_response_code( $response );
@@ -73,7 +80,16 @@ class SSAI_Claude_Provider implements SSAI_AI_Provider_Interface {
 			$message = __( 'Claude returned an error. Check credentials, model name, and quota.', 'sociaspark-ai-social-poster' );
 			if ( is_array( $body ) && ! empty( $body['error']['message'] ) ) {
 				$message = SSAI_Logger::redact_string( wp_strip_all_tags( (string) $body['error']['message'] ) );
-				SSAI_Logger::log( 'warning', 'ssai_claude_error', 'Provider error', array( 'status' => $status, 'model' => $payload['model'], 'message' => $message ) );
+				SSAI_Logger::log(
+					'warning',
+					'ssai_claude_error',
+					'Provider error',
+					array(
+						'status'  => $status,
+						'model'   => $payload['model'],
+						'message' => $message,
+					)
+				);
 			}
 
 			return new WP_Error(
