@@ -1,0 +1,50 @@
+{
+  "name": "sociaspark-ai-social-poster",
+  "version": "1.0.0",
+  "description": "WordPress admin dashboard for brand-aware AI social content generation and scheduling.",
+  "author": "Codefreex",
+  "license": "GPL-2.0-or-later",
+  "keywords": [
+    "wordpress",
+    "social-media",
+    "facebook",
+    "instagram",
+    "ai-content"
+  ],
+  "homepage": "https://codefreex.com/",
+  "repository": {
+    "type": "git",
+    "url": "https://codefreex.com/"
+  },
+  "bugs": {
+    "url": "https://codefreex.com/contact/"
+  },
+  "files": [
+    "admin/build",
+    "admin/src",
+    "assets/svg",
+    "docs",
+    "includes",
+    "languages",
+    "readme.txt",
+    "sociaspark-ai-social-poster.php",
+    "uninstall.php"
+  ],
+  "dependencies": {
+    "@wordpress/api-fetch": "^7.0.0",
+    "@wordpress/components": "^29.0.0",
+    "@wordpress/element": "^6.0.0",
+    "@wordpress/i18n": "^5.0.0"
+  },
+  "devDependencies": {
+    "@wordpress/scripts": "^30.0.0"
+  },
+  "scripts": {
+    "start": "wp-scripts start admin/src/index.js --output-path=admin/build",
+    "build": "wp-scripts build admin/src/index.js --output-path=admin/build",
+    "lint:js": "wp-scripts lint-js admin/src",
+    "lint:css": "wp-scripts lint-style admin/src/styles",
+    "packages-update": "wp-scripts packages-update",
+    "plugin-zip": "wp-scripts plugin-zip"
+  }
+}

@@ -1,0 +1,10 @@
+/node_modules/
+/vendor/
+/.wordpress-org/
+*.zip
+*.log
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-error.log*
+INSTRUCTIONS.md*
