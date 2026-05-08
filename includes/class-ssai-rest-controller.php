@@ -486,6 +486,11 @@ class SSAI_REST_Controller {
 			return new WP_Error( 'ssai_jobs_missing', __( 'At least one platform job is required.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
 		}
 
+		$validation = $this->validate_jobs_for_post( $post, $jobs );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
+		}
+
 		$created = $this->create_jobs( $post_id, $jobs );
 		if ( empty( $created ) ) {
 			return new WP_Error( 'ssai_jobs_invalid', __( 'No valid platform jobs could be created. Choose a connected Facebook or Instagram account.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
@@ -509,12 +514,18 @@ class SSAI_REST_Controller {
 		}
 
 		$post_id = absint( $data['post_id'] ?? 0 );
-		if ( ! $this->post_row( $post_id ) ) {
+		$post    = $this->post_row( $post_id );
+		if ( ! $post ) {
 			return new WP_Error( 'ssai_post_missing', __( 'Post was not found.', 'sociaspark-ai-social-poster' ), array( 'status' => 404 ) );
 		}
 
 		foreach ( $data['jobs'] as &$job ) {
 			$job['scheduled_at'] = current_time( 'mysql' );
+		}
+
+		$validation = $this->validate_jobs_for_post( $post, $data['jobs'] );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
 		}
 
 		$job_ids   = $this->create_jobs( $post_id, $data['jobs'] );
@@ -744,7 +755,7 @@ class SSAI_REST_Controller {
 			'media_id'          => ! empty( $data['media_id'] ) ? absint( $data['media_id'] ) : null,
 			'media_url'         => ! empty( $data['media_url'] ) ? esc_url_raw( $data['media_url'] ) : null,
 			'status'            => sanitize_key( $data['status'] ?? 'draft' ),
-			'scheduled_at'      => ! empty( $data['scheduled_at'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( (string) $data['scheduled_at'] ) ) : null,
+			'scheduled_at'      => $this->normalize_site_datetime( $data['scheduled_at'] ?? '' ),
 			'updated_at'        => $now,
 		);
 
@@ -829,7 +840,7 @@ class SSAI_REST_Controller {
 				continue;
 			}
 
-			$scheduled = ! empty( $job['scheduled_at'] ) ? gmdate( 'Y-m-d H:i:s', strtotime( (string) $job['scheduled_at'] ) ) : $now;
+			$scheduled = $this->normalize_site_datetime( $job['scheduled_at'] ?? '' ) ?: $now;
 			$wpdb->insert(
 				$table,
 				array(
@@ -922,15 +933,21 @@ class SSAI_REST_Controller {
 	 * @return array
 	 */
 	private function next_actions() {
-		$settings = $this->provider_status();
+		$settings    = $this->provider_status();
 		$connections = SSAI_Meta_Manager::list_connections();
-		$brand = SSAI_Brand_Intelligence::latest_profile();
-		$actions = array();
+		$connected   = array_filter(
+			$connections,
+			static function ( $connection ) {
+				return 'connected' === ( $connection['status'] ?? '' );
+			}
+		);
+		$brand       = SSAI_Brand_Intelligence::latest_profile();
+		$actions     = array();
 
 		if ( empty( $settings['openai'] ) && empty( $settings['gemini'] ) && empty( $settings['claude'] ) ) {
 			$actions[] = array( 'id' => 'settings', 'label' => __( 'Add at least one AI provider key', 'sociaspark-ai-social-poster' ) );
 		}
-		if ( empty( $connections ) ) {
+		if ( empty( $connected ) ) {
 			$actions[] = array( 'id' => 'connections', 'label' => __( 'Connect a Facebook Page or Instagram account', 'sociaspark-ai-social-poster' ) );
 		}
 		if ( empty( $brand ) ) {
@@ -975,13 +992,96 @@ class SSAI_REST_Controller {
 	private function earliest_schedule( $jobs ) {
 		$times = array();
 		foreach ( $jobs as $job ) {
-			if ( ! empty( $job['scheduled_at'] ) ) {
-				$times[] = strtotime( (string) $job['scheduled_at'] );
+			$scheduled = $this->normalize_site_datetime( $job['scheduled_at'] ?? '' );
+			if ( $scheduled ) {
+				$times[] = $scheduled;
 			}
 		}
 		if ( empty( $times ) ) {
 			return current_time( 'mysql' );
 		}
-		return gmdate( 'Y-m-d H:i:s', min( $times ) );
+		sort( $times );
+		return $times[0];
+	}
+
+	/**
+	 * Validates platform jobs before they are queued.
+	 *
+	 * @param array $post Post row.
+	 * @param array $jobs Requested jobs.
+	 * @return true|WP_Error
+	 */
+	private function validate_jobs_for_post( $post, $jobs ) {
+		foreach ( $jobs as $job ) {
+			$platform   = sanitize_key( $job['platform'] ?? '' );
+			$account_id = sanitize_text_field( $job['platform_account_id'] ?? '' );
+
+			if ( ! in_array( $platform, array( 'facebook', 'instagram' ), true ) || '' === $account_id ) {
+				continue;
+			}
+
+			$connection = SSAI_Meta_Manager::get_connection_for_publish( $platform, $account_id );
+			if ( is_wp_error( $connection ) ) {
+				return $connection;
+			}
+
+			if ( 'instagram' === $platform ) {
+				$media_url = $this->post_media_url( $post );
+				if ( '' === $media_url ) {
+					return new WP_Error( 'ssai_instagram_media_required', __( 'Instagram publishing requires an attached image or a public media URL.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
+				}
+
+				if ( 'https' !== strtolower( (string) wp_parse_url( $media_url, PHP_URL_SCHEME ) ) ) {
+					return new WP_Error( 'ssai_instagram_requires_https_image', __( 'Instagram publishing requires a public HTTPS image URL.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
+				}
+			}
+
+			if ( 'facebook' === $platform ) {
+				$caption = trim( (string) ( $post['content_facebook'] ?: $post['content_long'] ) );
+				if ( '' === $caption && '' === $this->post_media_url( $post ) ) {
+					return new WP_Error( 'ssai_facebook_content_required', __( 'Facebook publishing requires post copy or an attached image.', 'sociaspark-ai-social-poster' ), array( 'status' => 400 ) );
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * Resolves a post media URL for queue validation.
+	 *
+	 * @param array $post Post row.
+	 * @return string
+	 */
+	private function post_media_url( $post ) {
+		if ( ! empty( $post['media_id'] ) ) {
+			$url = wp_get_attachment_url( absint( $post['media_id'] ) );
+			if ( $url ) {
+				return esc_url_raw( $url );
+			}
+		}
+
+		return ! empty( $post['media_url'] ) ? esc_url_raw( $post['media_url'] ) : '';
+	}
+
+	/**
+	 * Normalizes dashboard datetimes into the site timezone.
+	 *
+	 * @param mixed $value Raw datetime value.
+	 * @return string|null
+	 */
+	private function normalize_site_datetime( $value ) {
+		$value = is_scalar( $value ) ? trim( (string) wp_unslash( $value ) ) : '';
+		if ( '' === $value ) {
+			return null;
+		}
+
+		try {
+			$date = new DateTimeImmutable( $value, wp_timezone() );
+		} catch ( Exception $exception ) {
+			return null;
+		}
+
+		return $date->setTimezone( wp_timezone() )->format( 'Y-m-d H:i:s' );
 	}
 }

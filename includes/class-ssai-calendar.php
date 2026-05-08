@@ -25,8 +25,8 @@ class SSAI_Calendar {
 
 		$jobs  = SSAI_Plugin::table( 'platform_jobs' );
 		$posts = SSAI_Plugin::table( 'posts' );
-		$from  = $from ? gmdate( 'Y-m-d H:i:s', strtotime( $from ) ) : gmdate( 'Y-m-d H:i:s', strtotime( '-30 days' ) );
-		$to    = $to ? gmdate( 'Y-m-d H:i:s', strtotime( $to ) ) : gmdate( 'Y-m-d H:i:s', strtotime( '+90 days' ) );
+		$from  = self::normalize_site_datetime( $from ) ?: wp_date( 'Y-m-d H:i:s', strtotime( '-30 days' ), wp_timezone() );
+		$to    = self::normalize_site_datetime( $to ) ?: wp_date( 'Y-m-d H:i:s', strtotime( '+90 days' ), wp_timezone() );
 
 		return $wpdb->get_results(
 			$wpdb->prepare(
@@ -34,7 +34,28 @@ class SSAI_Calendar {
 				$from,
 				$to
 			),
-			ARRAY_A
+				ARRAY_A
 		);
+	}
+
+	/**
+	 * Normalizes request datetimes into the site timezone.
+	 *
+	 * @param mixed $value Raw datetime value.
+	 * @return string|null
+	 */
+	private static function normalize_site_datetime( $value ) {
+		$value = is_scalar( $value ) ? trim( (string) $value ) : '';
+		if ( '' === $value ) {
+			return null;
+		}
+
+		try {
+			$date = new DateTimeImmutable( $value, wp_timezone() );
+		} catch ( Exception $exception ) {
+			return null;
+		}
+
+		return $date->setTimezone( wp_timezone() )->format( 'Y-m-d H:i:s' );
 	}
 }

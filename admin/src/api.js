@@ -52,6 +52,7 @@ export const api = {
 	createPostFromIdea: ( id ) =>
 		request( `/ideas/${ id }/create-post`, 'POST', {} ),
 	posts: () => request( '/posts' ),
+	getPost: ( id ) => request( `/posts/${ id }` ),
 	createPost: ( data ) => request( '/posts', 'POST', data ),
 	updatePost: ( id, data ) => request( `/posts/${ id }`, 'PUT', data ),
 	generateCaption: ( data ) =>

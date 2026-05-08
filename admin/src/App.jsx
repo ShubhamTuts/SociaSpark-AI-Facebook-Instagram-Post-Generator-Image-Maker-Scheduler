@@ -57,7 +57,8 @@ const initialComposer = {
 };
 
 export default function App() {
-	const [ route, setRoute ] = useState( 'dashboard' );
+	const [ route, setRouteId ] = useState( 'dashboard' );
+	const [ routeState, setRouteState ] = useState( null );
 	const [ notice, setNotice ] = useState( null );
 
 	useEffect( () => {
@@ -83,6 +84,11 @@ export default function App() {
 		}
 	};
 
+	const setRoute = ( nextRoute, nextState = null ) => {
+		setRouteId( nextRoute );
+		setRouteState( nextState );
+	};
+
 	return h(
 		'div',
 		{ className: 'ssai-app' },
@@ -93,7 +99,8 @@ export default function App() {
 			notice && h( Toast, { notice, onClose: () => setNotice( null ) } ),
 			route === 'welcome' && h( Welcome, { run, setRoute } ),
 			route === 'dashboard' && h( Dashboard, { setRoute } ),
-			route === 'create' && h( CreatePost, { run, setRoute } ),
+			route === 'create' &&
+				h( CreatePost, { run, setRoute, routeState } ),
 			route === 'studio' && h( AIStudio, { run } ),
 			route === 'brand' && h( BrandIntelligence, { run } ),
 			route === 'calendar' && h( CalendarView, { run } ),
@@ -181,7 +188,7 @@ function Welcome( { run, setRoute } ) {
 			data?.provider?.gemini ||
 			data?.provider?.claude
 	);
-	const connectionReady = Boolean( data?.connections?.length );
+	const connectionReady = Boolean( data?.counts?.connections );
 	const brandReady = Boolean( data?.brand?.profile );
 	const items = [
 		{
@@ -288,7 +295,7 @@ function Dashboard( { setRoute } ) {
 			data?.provider?.gemini ||
 			data?.provider?.claude
 	);
-	const connectionReady = Boolean( data?.connections?.length );
+	const connectionReady = Boolean( counts.connections );
 	const brandReady = Boolean( brand?.profile || brand?.voice );
 
 	return h(
@@ -395,7 +402,11 @@ function Dashboard( { setRoute } ) {
 							title: 'Recent posts',
 							body: 'Drafts and published social posts created by SociaSpark.',
 						} ),
-						h( PostList, { posts: data?.recent_posts || [] } )
+						h( PostList, {
+							posts: data?.recent_posts || [],
+							onOpen: ( postId ) =>
+								setRoute( 'create', { postId } ),
+						} )
 					),
 					h(
 						Panel,
@@ -451,7 +462,7 @@ function ActionList( { items, setRoute } ) {
 	);
 }
 
-function CreatePost( { run, setRoute } ) {
+function CreatePost( { run, setRoute, routeState } ) {
 	const [ state, setState ] = useState( initialComposer );
 	const [ models, setModels ] = useState( null );
 	const [ wpResults, setWpResults ] = useState( [] );
@@ -478,6 +489,64 @@ function CreatePost( { run, setRoute } ) {
 		}
 	}, [ models, state.text_model ] );
 
+	useEffect( () => {
+		const draftId = Number( routeState?.postId || 0 );
+		if ( ! draftId || draftId === postId ) {
+			return undefined;
+		}
+
+		let active = true;
+		setBusy( 'load-draft' );
+		setMediaNotice( '' );
+
+		api.getPost( draftId )
+			.then( ( post ) => {
+				if ( ! active || ! post ) {
+					return;
+				}
+
+				setPostId( post.id );
+				setVariations( [] );
+				setState( ( current ) => ( {
+					...current,
+					source:
+						post.source_type === 'idea_bank'
+							? 'manual'
+							: post.source_type || 'manual',
+					title: post.title || '',
+					idea:
+						post.content_long ||
+						post.content_facebook ||
+						post.content_instagram ||
+						'',
+					wp_post_id: post.wp_post_id || '',
+					content_facebook: post.content_facebook || '',
+					content_instagram: post.content_instagram || '',
+					media_id: post.media_id || '',
+					media_url: post.media_url || '',
+					scheduled_at: post.scheduled_at
+						? post.scheduled_at.replace( ' ', 'T' ).slice( 0, 16 )
+						: '',
+				} ) );
+			} )
+			.catch( ( error ) => {
+				if ( active ) {
+					setMediaNotice(
+						error?.message || 'Could not load the selected draft.'
+					);
+				}
+			} )
+			.finally( () => {
+				if ( active ) {
+					setBusy( '' );
+				}
+			} );
+
+		return () => {
+			active = false;
+		};
+	}, [ routeState, postId ] );
+
 	const selected = variations[ state.selectedVariation ] || {};
 	const activeFacebook =
 		state.content_facebook ??
@@ -489,7 +558,10 @@ function CreatePost( { run, setRoute } ) {
 		selected.instagram_caption ??
 		selected.caption ??
 		'';
-	const selectedAccounts = connections.filter(
+	const connectedConnections = connections.filter(
+		( connection ) => connection.status === 'connected'
+	);
+	const selectedAccounts = connectedConnections.filter(
 		( connection ) => state[ accountKey( connection ) ]
 	);
 	const textModels = getTextModelOptions( models, state.provider );
@@ -1069,7 +1141,11 @@ function CreatePost( { run, setRoute } ) {
 							update( 'content_instagram', value ),
 					} )
 				),
-				h( AccountPicker, { connections, state, setState } ),
+				h( AccountPicker, {
+					connections: connectedConnections,
+					state,
+					setState,
+				} ),
 				h(
 					'div',
 					{
@@ -1919,15 +1995,19 @@ function Ideas( { run, setRoute } ) {
 													Button,
 													{
 														onClick: async () => {
-															await run(
-																() =>
-																	api.createPostFromIdea(
-																		idea.id
-																	),
-																'Draft created from idea.'
-															);
+															const created =
+																await run(
+																	() =>
+																		api.createPostFromIdea(
+																			idea.id
+																		),
+																	'Draft created from idea.'
+																);
 															setRoute(
-																'create'
+																'create',
+																{
+																	postId: created?.id,
+																}
 															);
 														},
 													},
@@ -2567,7 +2647,7 @@ function Roadmap() {
 	);
 }
 
-function PostList( { posts = [] } ) {
+function PostList( { posts = [], onOpen } ) {
 	if ( ! posts.length ) {
 		return h( EmptyState, {
 			title: 'No posts yet',
@@ -2590,6 +2670,13 @@ function PostList( { posts = [] } ) {
 							'small',
 							null,
 							`${ post.jobs.length } platform job(s)`
+					  )
+					: null,
+				onOpen
+					? h(
+							Button,
+							{ onClick: () => onOpen( post.id ) },
+							post.status === 'draft' ? 'Open Draft' : 'Open'
 					  )
 					: null
 			)
@@ -2643,16 +2730,27 @@ function ActivityList( { items = [] } ) {
 	return h(
 		'div',
 		{ className: 'ssai-activity-list' },
-		items.map( ( item ) =>
-			h(
+		items.map( ( item ) => {
+			const detail = [
+				item.context?.provider,
+				item.context?.model,
+				item.context?.error_code,
+				item.context?.status ? `HTTP ${ item.context.status }` : null,
+			]
+				.filter( Boolean )
+				.join( ' | ' );
+			const message = item.context?.message || item.message;
+
+			return h(
 				'div',
 				{ key: item.id },
 				h( Badge, { tone: statusTone( item.level ) }, item.level ),
 				h( 'strong', null, item.event ),
-				h( 'span', null, item.message ),
+				h( 'span', null, message ),
+				detail ? h( 'small', null, detail ) : null,
 				h( 'small', null, item.created_at )
-			)
-		)
+			);
+		} )
 	);
 }
 
